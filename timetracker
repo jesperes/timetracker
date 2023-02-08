@@ -1,0 +1,18 @@
+#!/bin/bash
+
+COMMAND=$1
+
+if [ -z "$COMMAND" ]; then
+    echo "Stopping..."
+    _build/default/rel/timetracker/bin/timetracker stop
+
+    echo "Building..."
+    export QUIET=t
+    rebar3 format
+    rebar3 release
+
+    echo "Starting..."
+    _build/default/rel/timetracker/bin/timetracker daemon
+else
+    _build/default/rel/timetracker/bin/timetracker "$COMMAND"
+fi

@@ -1,14 +1,11 @@
-{application, timetracker,
- [{description, "An escript"},
-  {vsn, "0.1.0"},
+{application,
+ timetracker,
+ [{description, "Timetracker application"},
+  {vsn, git},
   {registered, []},
-  {applications,
-   [kernel,
-    stdlib
-   ]},
-  {env,[]},
+  {applications, [kernel, stdlib]},
+  {env, []},
+  {mod, {timetracker_app, []}},
   {modules, []},
-
   {licenses, ["Apache-2.0"]},
-  {links, []}
- ]}.
+  {links, []}]}.
