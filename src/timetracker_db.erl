@@ -69,7 +69,9 @@ sync_state(State) ->
 read_state() ->
   case file:consult(state_filename()) of
     {ok, [Map]} ->
-      ?LOG_INFO("Worked seconds today: ~p", [maps:get(worked_secs, Map, 0)]),
+      ?LOG_INFO("Time worked today: ~s",
+                [tt_notify:fmt_seconds(
+                   maps:get(worked_secs, Map, 0))]),
       Map;
     {error, enoent} ->
       ?LOG_INFO("No state file found for today, starting new one.", []),

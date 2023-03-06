@@ -1,6 +1,6 @@
 -module(tt_notify).
 
--export([maybe_notify_daily_limit/1]).
+-export([maybe_notify_daily_limit/1, fmt_seconds/1]).
 
 -include_lib("kernel/include/logger.hrl").
 
