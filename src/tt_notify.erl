@@ -10,26 +10,29 @@ maybe_notify_daily_limit(Seconds) ->
 
 maybe_notify_daily_limit(Seconds, DailyLimit) ->
   LastNotify = application:get_env(timetracker, last_notify, 0),
-  Now = erlang:system_time(second),
-  application:set_env(timetracker, last_notify, Now),
 
-  if Now - LastNotify > 300 ->
-       if Seconds > DailyLimit ->
-            Msg =
-              io_lib:format("You have worked ~s today.\n"
-                            "This is ~s more than your limit, which is ~s.",
-                            [fmt_seconds(Seconds),
-                             fmt_seconds(Seconds - DailyLimit),
-                             fmt_seconds(DailyLimit)]),
-            ?LOG_WARNING(Msg),
-            display_dialog(Msg);
-          true ->
-            ?LOG_INFO("You have worked ~s today. You have ~s left before you have reached your limit, which is ~s.",
-                      [fmt_seconds(Seconds),
-                       fmt_seconds(DailyLimit - Seconds),
-                       fmt_seconds(DailyLimit)])
-       end;
+  Now = erlang:system_time(second),
+  ShouldNotify = Now - LastNotify > 300,
+  ShouldLog = Now - LastNotify > 60,
+  HasExceededLimit = Seconds > DailyLimit,
+
+  if ShouldNotify andalso HasExceededLimit ->
+       Msg =
+         io_lib:format("You have worked ~s today.\n"
+                       "This is ~s more than your limit, which is ~s.",
+                       [fmt_seconds(Seconds),
+                        fmt_seconds(Seconds - DailyLimit),
+                        fmt_seconds(DailyLimit)]),
+       ?LOG_WARNING(Msg),
+       display_dialog(Msg);
+     ShouldLog andalso not HasExceededLimit ->
+       ?LOG_INFO("You have worked ~s today. You have ~s left before "
+                 "you have reached your limit, which is ~s.",
+                 [fmt_seconds(Seconds),
+                  fmt_seconds(DailyLimit - Seconds),
+                  fmt_seconds(DailyLimit)]);
      true ->
+       %% ?LOG_DEBUG("Time since last notification: ~p", [Now - LastNotify]),
        ok
   end.
 
@@ -45,5 +48,7 @@ display_dialog(Msg) ->
            Cmd =
              lists:flatten(
                io_lib:format("xmessage -center -timeout 30 '~s'", [Msg])),
+           Now = erlang:system_time(second),
+           application:set_env(timetracker, last_notify, Now),
            os:cmd(Cmd)
         end).

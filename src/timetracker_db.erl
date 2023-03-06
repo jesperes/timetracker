@@ -13,8 +13,7 @@
 
 -spec register_activity_period(Length :: integer()) -> ok.
 register_activity_period(Length) ->
-  gen_server:cast(?SERVER, {reg_period, Length}),
-  ok.
+  gen_server:call(?SERVER, {reg_period, Length}).
 
 get_worked_secs() ->
   gen_server:call(?SERVER, get_worked_secs).
@@ -27,12 +26,12 @@ init([]) ->
   {ok, read_state()}.
 
 handle_call(get_worked_secs, _From, State) ->
-  {reply, maps:get(worked_secs, State, 0), State}.
-
-handle_cast({reg_period, Length}, State) ->
+  {reply, maps:get(worked_secs, State, 0), State};
+handle_call({reg_period, Length}, _From, State) ->
   ?LOG_INFO("Registering new activity period, ~p seconds long", [Length]),
   NewState = maps:update_with(worked_secs, fun(Old) -> Length + Old end, Length, State),
-  {noreply, sync_state(NewState)};
+  {reply, maps:get(worked_secs, State, 0), sync_state(NewState)}.
+
 handle_cast(Msg, State) ->
   ?LOG_ERROR("Unknown cast: ~p", [Msg]),
   {noreply, State}.

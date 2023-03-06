@@ -46,7 +46,6 @@ handle_call(_Msg, _From, State) ->
 
 handle_cast({event, _Event}, #state{is_working = true} = State) ->
   %% We are currently working, just update the "last_activity" timestamp
-  maybe_notify_daily_limit(State),
   {noreply, State#state{last_activity = timestamp_now()}};
 handle_cast({event, Event}, #state{is_working = false} = State) ->
   %% We were idle, but have started working again
@@ -73,14 +72,18 @@ handle_cast(?CHECK_ACTIVITY,
        ?LOG_INFO("Inactivity threshold exceeded; stopping work timer. Length of activity period ~p ~ss.",
                  [Duration, ?TIME_UNIT]),
        timetracker_db:register_activity_period(Duration),
-       {noreply, State#state{activity_period_start = undefined, is_working = false}};
+       NewState = State#state{activity_period_start = undefined, is_working = false},
+       maybe_notify_daily_limit(NewState),
+       {noreply, NewState};
      Duration > 60 ->
-       %% ?LOG_INFO("Activity period max length exceeded, starting new one", []),
+       ?LOG_INFO("Activity period max length exceeded, starting new one", []),
        timetracker_db:register_activity_period(Duration),
-       {noreply,
-        State#state{activity_period_start = Now,
-                    last_activity = Now,
-                    is_working = true}};
+       NewState =
+         State#state{activity_period_start = Now,
+                     last_activity = Now,
+                     is_working = true},
+       maybe_notify_daily_limit(NewState),
+       {noreply, NewState};
      true ->
        {noreply, State}
   end.
@@ -90,7 +93,6 @@ terminate(_How,
                  is_working = IsWorking,
                  last_activity = LastActivity,
                  activity_period_start = Start}) ->
-  ?LOG_DEBUG("Terminating...", []),
   if IsWorking ->
        Duration = LastActivity - Start,
        timetracker_db:register_activity_period(Duration);
@@ -98,6 +100,7 @@ terminate(_How,
        ok
   end,
   timer:cancel(TRef),
+  ?LOG_NOTICE("Terminated timetracker server", []),
   ok.
 
 timestamp_now() ->
