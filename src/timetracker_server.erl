@@ -69,8 +69,8 @@ handle_cast(?CHECK_ACTIVITY,
 
   ?LOG_DEBUG("Checking activity. Last activity ~p ~ss ago.", [Age, ?TIME_UNIT]),
   if Age > Threshold ->
-       ?LOG_INFO("Inactivity threshold exceeded; stopping work timer. Length of activity period ~p ~ss.",
-                 [Duration, ?TIME_UNIT]),
+       ?LOG_INFO("Inactivity threshold exceeded (last activity ~ws ago); stopping work timer. Length of activity period ~p ~ss.",
+                 [Age, Duration, ?TIME_UNIT]),
        timetracker_db:register_activity_period(Duration),
        NewState = State#state{activity_period_start = undefined, is_working = false},
        maybe_notify_daily_limit(NewState),
@@ -110,6 +110,8 @@ get_app_env(Key) ->
   {ok, Value} = application:get_env(timetracker, Key),
   Value.
 
+maybe_notify_daily_limit(#state{is_working = false}) ->
+  ok;
 maybe_notify_daily_limit(#state{activity_period_start = Start}) ->
   WorkedSecs = timetracker_db:get_worked_secs(),
   Duration = timestamp_now() - Start,
