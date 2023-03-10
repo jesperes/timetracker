@@ -48,7 +48,7 @@ fmt(Time, Unit) ->
   Formatted =
     lists:flatten(
       io_lib:format("~2..0w:~2..0w:~2..0w", [Hours, Minutes, S1])),
-  ?LOG_DEBUG("~w ~ss -> ~s (hh:mm:ss)", [Time, Unit, Formatted]),
+  %% ?LOG_DEBUG("~w ~ss -> ~s (hh:mm:ss)", [Time, Unit, Formatted]),
   Formatted.
 
 display_dialog(Msg) ->
