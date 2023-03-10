@@ -5,18 +5,22 @@
 -include_lib("kernel/include/logger.hrl").
 
 %% API
--export([start_link/0, register_activity_period/1, get_worked_secs/0]).
+-export([start_link/0, register_activity_period/1, get_worked_time/0]).
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(SERVER, ?MODULE).
+-define(worked_time, worked_time).
+-define(unit, unit).
 
+%% Unit is given by timetracker_server:get_timeunit()
 -spec register_activity_period(Length :: integer()) -> ok.
 register_activity_period(Length) ->
   gen_server:call(?SERVER, {reg_period, Length}).
 
-get_worked_secs() ->
-  gen_server:call(?SERVER, get_worked_secs).
+-spec get_worked_time() -> integer().
+get_worked_time() ->
+  gen_server:call(?SERVER, get_worked_time).
 
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
@@ -25,12 +29,14 @@ init([]) ->
   process_flag(trap_exit, true),
   {ok, read_state()}.
 
-handle_call(get_worked_secs, _From, State) ->
-  {reply, maps:get(worked_secs, State, 0), State};
+handle_call(get_worked_time, _From, State) ->
+  {reply, maps:get(?worked_time, State, 0), State};
 handle_call({reg_period, Length}, _From, State) ->
-  ?LOG_INFO("Registering new activity period, ~p seconds long", [Length]),
-  NewState = maps:update_with(worked_secs, fun(Old) -> Length + Old end, Length, State),
-  {reply, maps:get(worked_secs, State, 0), sync_state(NewState)}.
+  ?LOG_INFO("Registering new activity period, ~p ~ss long",
+            [Length, timetracker_server:get_timeunit()]),
+  NewState = maps:update_with(?worked_time, fun(Old) -> Length + Old end, Length, State),
+  NewWorkedTime = maps:get(?worked_time, State, 0),
+  {reply, NewWorkedTime, sync_state(NewState)}.
 
 handle_cast(Msg, State) ->
   ?LOG_ERROR("Unknown cast: ~p", [Msg]),
@@ -44,7 +50,7 @@ terminate(_Reason, _State) ->
 
 %% Internals
 default_state() ->
-  #{worked_secs => 0}.
+  #{?worked_time => 0, ?unit => timetracker_server:get_timeunit()}.
 
 state_filename() ->
   {{Y, M, D}, _} = calendar:local_time(),
@@ -70,8 +76,8 @@ read_state() ->
   case file:consult(state_filename()) of
     {ok, [Map]} ->
       ?LOG_INFO("Time worked today: ~s",
-                [tt_notify:fmt_seconds(
-                   maps:get(worked_secs, Map, 0))]),
+                [tt_notify:fmt(
+                   maps:get(?worked_time, Map, 0))]),
       Map;
     {error, enoent} ->
       ?LOG_INFO("No state file found for today, starting new one.", []),

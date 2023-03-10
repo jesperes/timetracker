@@ -4,16 +4,14 @@ set -e
 COMMAND=$1
 
 if [ -z "$COMMAND" ]; then
+    echo "Building..."
+    export QUIET=t
+    rebar3 "do" format,compile,dialyzer,release
+
     if _build/default/rel/timetracker/bin/timetracker status; then
         echo "Stopping..."
         _build/default/rel/timetracker/bin/timetracker stop
     fi
-
-    echo "Building..."
-    export QUIET=t
-    rebar3 compile
-    rebar3 format
-    rebar3 release
 
     echo "Starting..."
     _build/default/rel/timetracker/bin/timetracker daemon

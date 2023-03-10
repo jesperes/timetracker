@@ -12,8 +12,8 @@ start_link() ->
 
 init(_Args) ->
   process_flag(trap_exit, true),
-  {ok, Interval} = application:get_env(timetracker, activity_check_interval),
-  {ok, TRef} = timer:apply_interval(Interval, ?MODULE, check_video, []),
+  {ok, IntervalMs} = application:get_env(timetracker, activity_check_interval_ms),
+  {ok, TRef} = timer:apply_interval(IntervalMs, ?MODULE, check_video, []),
   {ok, #state{tref = TRef}}.
 
 handle_call(_Msg, _From, State) ->

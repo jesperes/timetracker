@@ -21,8 +21,8 @@ init(Device) when is_integer(Device) ->
   %% Do not trigger events for every mouse/keyboard event registered
   %% by xinput, instead check at a given interval if there has been
   %% any activity.
-  {ok, Interval} = application:get_env(timetracker, activity_check_interval),
-  {ok, TRef} = timer:apply_interval(Interval, gen_server, cast, [self(), ?REG_ACTIVITY]),
+  {ok, IntervalMs} = application:get_env(timetracker, activity_check_interval_ms),
+  {ok, TRef} = timer:apply_interval(IntervalMs, gen_server, cast, [self(), ?REG_ACTIVITY]),
   {ok,
    #state{port = Port,
           tref = TRef,

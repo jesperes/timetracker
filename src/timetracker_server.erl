@@ -4,16 +4,22 @@
 
 -include_lib("kernel/include/logger.hrl").
 
--export([start_link/0, init/1, handle_call/3, handle_cast/2, terminate/2, event/1]).
+-export([start_link/0, init/1, handle_call/3, handle_cast/2, terminate/2, event/1,
+         get_timeunit/0, timestamp_now/0]).
 
 -type event() :: term().
 
--define(INTERVAL, 5000).
+%% Don't use exactly 5000 to avoid rounding issues when polling the
+%% events.
+-define(INTERVAL, 4711).
 -define(CHECK_ACTIVITY, check_activity).
--define(TIME_UNIT, second).
+%% All time calculations is done using this time unit. The only
+%% conversions to/from other units are when displaying formatted time
+%% and when reading configuration values from app envs.
+-define(TIME_UNIT, millisecond).
 
 -record(state,
-        {last_activity :: integer(),
+        {last_activity :: integer() | undefined,
          activity_period_start :: integer() | undefined,
          tref :: timer:tref(),
          is_working :: boolean(),
@@ -23,8 +29,11 @@
 
 -spec event(Event :: event()) -> ok.
 event(Event) ->
-  ?LOG_DEBUG("Event detected: ~p", [Event]),
+  %% ?LOG_DEBUG("Event detected: ~p", [Event]),
   gen_server:cast(?MODULE, {event, Event}).
+
+get_timeunit() ->
+  ?TIME_UNIT.
 
 %% gen_server callbacks
 
@@ -39,7 +48,8 @@ init(_Args) ->
           activity_period_start = undefined,
           last_activity = undefined,
           is_working = false,
-          inactivity_threshold = get_app_env(inactivity_threshold)}}.
+          inactivity_threshold =
+            erlang:convert_time_unit(get_app_env(inactivity_threshold_secs), second, ?TIME_UNIT)}}.
 
 handle_call(_Msg, _From, State) ->
   {noreply, State}.
@@ -47,10 +57,18 @@ handle_call(_Msg, _From, State) ->
 handle_cast({event, _Event}, #state{is_working = true} = State) ->
   %% We are currently working, just update the "last_activity" timestamp
   {noreply, State#state{last_activity = timestamp_now()}};
-handle_cast({event, Event}, #state{is_working = false} = State) ->
+handle_cast({event, Event},
+            #state{is_working = false, last_activity = LastActivity} = State) ->
   %% We were idle, but have started working again
-  ?LOG_INFO("Activity detected (~p) after being idle, starting work timer.", [Event]),
   Now = timestamp_now(),
+  if LastActivity =:= undefined ->
+       ?LOG_INFO("Activity detected on ~p, starting work timer.", [Event]);
+     true ->
+       IdleTime = Now - LastActivity,
+       ?LOG_INFO("Activity detected on ~p after being idle for ~p ~ss (~s), starting work timer.",
+                 [Event, IdleTime, ?TIME_UNIT, tt_notify:fmt(IdleTime)])
+  end,
+
   {noreply,
    State#state{is_working = true,
                activity_period_start = Now,
@@ -67,22 +85,14 @@ handle_cast(?CHECK_ACTIVITY,
   Age = Now - LastActivity,
   Duration = LastActivity - Start,
 
-  ?LOG_DEBUG("Checking activity. Last activity ~p ~ss ago.", [Age, ?TIME_UNIT]),
+  ?LOG_DEBUG("last_activity=~p current_period=~p time_until_inactive=~p unit=~p",
+             [Age, Duration, Threshold - Age, ?TIME_UNIT]),
   if Age > Threshold ->
-       ?LOG_INFO("Inactivity threshold exceeded (last activity ~ws ago); stopping work timer. Length of activity period ~p ~ss.",
-                 [Age, Duration, ?TIME_UNIT]),
-       timetracker_db:register_activity_period(Duration),
+       ?LOG_INFO("Inactivity threshold exceeded (last activity ~s ~ss ago); stopping work timer. Length of activity period ~p ~ss.",
+                 [Age, ?TIME_UNIT, Duration, ?TIME_UNIT]),
+       WorkedTime = timetracker_db:register_activity_period(Duration),
+       tt_notify:maybe_notify_daily_limit(WorkedTime),
        NewState = State#state{activity_period_start = undefined, is_working = false},
-       maybe_notify_daily_limit(NewState),
-       {noreply, NewState};
-     Duration > 60 ->
-       ?LOG_INFO("Activity period max length exceeded, starting new one", []),
-       timetracker_db:register_activity_period(Duration),
-       NewState =
-         State#state{activity_period_start = Now,
-                     last_activity = Now,
-                     is_working = true},
-       maybe_notify_daily_limit(NewState),
        {noreply, NewState};
      true ->
        {noreply, State}
@@ -109,10 +119,3 @@ timestamp_now() ->
 get_app_env(Key) ->
   {ok, Value} = application:get_env(timetracker, Key),
   Value.
-
-maybe_notify_daily_limit(#state{is_working = false}) ->
-  ok;
-maybe_notify_daily_limit(#state{activity_period_start = Start}) ->
-  WorkedSecs = timetracker_db:get_worked_secs(),
-  Duration = timestamp_now() - Start,
-  tt_notify:maybe_notify_daily_limit(WorkedSecs + Duration).
