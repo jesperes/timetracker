@@ -87,10 +87,15 @@ handle_cast(?CHECK_ACTIVITY,
 
   {ok, V} = application:get_env(timetracker, workday_length_secs),
   DailyLimit = erlang:convert_time_unit(V, second, timetracker_server:get_timeunit()),
-  TimeToDailyLimit = DailyLimit - timetracker_db:get_worked_time(),
+  TimeToDailyLimit = DailyLimit - timetracker_db:get_worked_time() - (Now - Start),
 
-  ?LOG_DEBUG("last_activity=~p current_period=~p time_until_inactive=~p time_to_daily_limit=~s unit=~p",
-             [Age, Duration, Threshold - Age, tt_notify:fmt(TimeToDailyLimit), ?TIME_UNIT]),
+  if TimeToDailyLimit > 0 ->
+       ?LOG_DEBUG("last_activity=~p current_period=~p time_until_inactive=~p time_to_daily_limit=~s unit=~p",
+                  [Age, Duration, Threshold - Age, tt_notify:fmt(TimeToDailyLimit), ?TIME_UNIT]);
+     true ->
+       ?LOG_WARNING("[PAST DAILY LIMIT] last_activity=~p current_period=~p time_until_inactive=~p time_past_daily_limit=~s unit=~p",
+                    [Age, Duration, Threshold - Age, tt_notify:fmt(-TimeToDailyLimit), ?TIME_UNIT])
+  end,
 
   if Age > Threshold ->
        ?LOG_INFO("Inactivity threshold exceeded (last activity ~p ~ss ago); stopping work timer. Length of activity period ~p ~ss.",
@@ -100,6 +105,9 @@ handle_cast(?CHECK_ACTIVITY,
        NewState = State#state{activity_period_start = undefined, is_working = false},
        {noreply, NewState};
      true ->
+       WorkedTime = timetracker_db:get_worked_time(),
+       CurrentActivityPeriod = Duration,
+       tt_notify:maybe_notify_daily_limit(WorkedTime + CurrentActivityPeriod),
        {noreply, State}
   end.
 
