@@ -1,6 +1,6 @@
 -module(tt_utils).
 
--export([get_time_env/1, get_time_env/2, format_time/1]).
+-export([get_time_env/1, get_time_env/2, format_time/1, format_date/1]).
 
 -type system_time_native() :: integer().
 
@@ -32,3 +32,6 @@ format_time(Duration) ->
     calendar:seconds_to_daystime(
       erlang:convert_time_unit(Duration, native, second)),
   io_lib:format("~2..0w:~2..0w:~2..0w", [H, M, S]).
+
+format_date({Y, M, D}) ->
+  io_lib:format("~4..0w:~2..0w:~2..0w", [Y, M, D]).

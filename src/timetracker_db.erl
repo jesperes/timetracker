@@ -10,7 +10,8 @@
 -include_lib("kernel/include/logger.hrl").
 
 %% API
--export([start_link/0, get_worked_time/1, get_worked_time/0, register_workunit/2]).
+-export([start_link/0, get_worked_time/1, get_worked_time/0, register_workunit/2,
+         info/0]).
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
@@ -24,6 +25,35 @@
         {start :: calendar:datetime() | {calendar:date(), '_'},
          duration :: calendar:time() | '_'}).
 -record(state, {dbref :: reference()}).
+
+info() ->
+  Now = erlang:system_time(),
+  Day = erlang:convert_time_unit(86400, second, native),
+  Str =
+    lists:map(fun(S) ->
+                 {Date, _} = calendar:system_time_to_local_time(S, native),
+                 WorkedTime = get_worked_time(Date),
+                 if WorkedTime == 0 ->
+                      io_lib:format("~s: -- no work registered --~n",
+                                    [tt_utils:format_date(Date)]);
+                    true ->
+                      DailyLimit = tt_utils:get_time_env(workday_length, {8 * 60 * 60, second}),
+                      Diff = DailyLimit - WorkedTime,
+                      if Diff > 0 ->
+                           io_lib:format("~s: ~s (~s left to daily limit)~n",
+                                         [tt_utils:format_date(Date),
+                                          tt_utils:format_time(WorkedTime),
+                                          tt_utils:format_time(Diff)]);
+                         true ->
+                           io_lib:format("~s: ~s (worked ~s more than daily limit)~n",
+                                         [tt_utils:format_date(Date),
+                                          tt_utils:format_time(WorkedTime),
+                                          tt_utils:format_time(-Diff)])
+                      end
+                 end
+              end,
+              lists:seq(Now - 7 * Day, Now, Day)),
+  io:format("~s", [Str]).
 
 -spec register_workunit(Start :: system_time(), Duration :: system_time()) -> ok.
 register_workunit(Start, Duration) ->
@@ -49,7 +79,6 @@ init([]) ->
   Filename = application:get_env(timetracker, db_filename, "timetracker.dets"),
   {ok, Ref} = dets:open_file(?TABLE, [{file, Filename}, {keypos, 2}, {type, set}]),
   ?LOG_INFO(#{label => "Opened table", info => dets:info(?TABLE)}),
-
   {Date, _} =
     calendar:now_to_local_time(
       erlang:timestamp()),
