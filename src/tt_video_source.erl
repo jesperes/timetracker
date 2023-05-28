@@ -12,7 +12,9 @@ start_link() ->
 
 init(_Args) ->
   process_flag(trap_exit, true),
-  {ok, IntervalMs} = application:get_env(timetracker, activity_check_interval_ms),
+  IntervalMs =
+    erlang:convert_time_unit(
+      tt_utils:get_time_env(activity_check_interval, {1, second}), native, millisecond),
   {ok, TRef} = timer:apply_interval(IntervalMs, ?MODULE, check_video, []),
   {ok, #state{tref = TRef}}.
 
