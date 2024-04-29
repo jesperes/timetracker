@@ -16,5 +16,6 @@ if [ -z "$COMMAND" ]; then
     echo "Starting..."
     _build/default/rel/timetracker/bin/timetracker daemon
 else
-    _build/default/rel/timetracker/bin/timetracker "$COMMAND"
+    shift
+    _build/default/rel/timetracker/bin/timetracker "$COMMAND" "$@"
 fi

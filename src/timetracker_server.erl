@@ -30,7 +30,7 @@ start_link() ->
 
 init(_Args) ->
   process_flag(trap_exit, true),
-  {ok, TRef} = timer:apply_interval(1000, gen_server, cast, [self(), ?CHECK_ACTIVITY]),
+  {ok, TRef} = timer:apply_interval(10000, gen_server, cast, [self(), ?CHECK_ACTIVITY]),
   {ok,
    #state{tref = TRef,
           activity_period_start = undefined,

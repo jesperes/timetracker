@@ -29,31 +29,28 @@
 info() ->
   Now = erlang:system_time(),
   Day = erlang:convert_time_unit(86400, second, native),
-  Str =
-    lists:map(fun(S) ->
-                 {Date, _} = calendar:system_time_to_local_time(S, native),
-                 WorkedTime = get_worked_time(Date),
-                 if WorkedTime == 0 ->
-                      io_lib:format("~s: -- no work registered --~n",
-                                    [tt_utils:format_date(Date)]);
-                    true ->
-                      DailyLimit = tt_utils:get_time_env(workday_length, {8 * 60 * 60, second}),
-                      Diff = DailyLimit - WorkedTime,
-                      if Diff > 0 ->
-                           io_lib:format("~s: ~s (~s left to daily limit)~n",
-                                         [tt_utils:format_date(Date),
-                                          tt_utils:format_time(WorkedTime),
-                                          tt_utils:format_time(Diff)]);
-                         true ->
-                           io_lib:format("~s: ~s (worked ~s more than daily limit)~n",
-                                         [tt_utils:format_date(Date),
-                                          tt_utils:format_time(WorkedTime),
-                                          tt_utils:format_time(-Diff)])
-                      end
-                 end
-              end,
-              lists:seq(Now - 7 * Day, Now, Day)),
-  io:format("~s", [Str]).
+  lists:foreach(fun(S) ->
+                   {Date, _} = calendar:system_time_to_local_time(S, native),
+                   WorkedTime = get_worked_time(Date),
+                   if WorkedTime == 0 ->
+                        ?LOG_INFO("~s: -- no work registered --~n", [tt_utils:format_date(Date)]);
+                      true ->
+                        DailyLimit = tt_utils:get_time_env(workday_length, {8 * 60 * 60, second}),
+                        Diff = DailyLimit - WorkedTime,
+                        if Diff > 0 ->
+                             ?LOG_INFO("~s: ~s (~s left to daily limit)~n",
+                                       [tt_utils:format_date(Date),
+                                        tt_utils:format_time(WorkedTime),
+                                        tt_utils:format_time(Diff)]);
+                           true ->
+                             ?LOG_INFO("~s: ~s (worked ~s more than daily limit)~n",
+                                       [tt_utils:format_date(Date),
+                                        tt_utils:format_time(WorkedTime),
+                                        tt_utils:format_time(-Diff)])
+                        end
+                   end
+                end,
+                lists:seq(Now - 7 * Day, Now, Day)).
 
 -spec register_workunit(Start :: system_time(), Duration :: system_time()) -> ok.
 register_workunit(Start, Duration) ->
