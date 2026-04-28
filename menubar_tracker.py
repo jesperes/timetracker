@@ -125,8 +125,10 @@ class TimeTrackerApp(rumps.App):
                         self.idle_auto_paused = True
                         print(f"Auto-paused work session (idle for {int(idle_seconds)}s)")
                 elif idle_seconds <= self.idle_threshold and self.idle_auto_paused:
-                    # User is active again - reset flag (don't auto-resume)
+                    # User is active again - auto resume
+                    self.tracker.start()
                     self.idle_auto_paused = False
+                    print(f"Auto-resumed work session (user active after {int(idle_seconds)}s idle)")
 
             except Exception as e:
                 print(f"Error in idle monitor: {e}")
@@ -174,7 +176,7 @@ class TimeTrackerApp(rumps.App):
                 if self.current_idle_seconds >= self.idle_threshold:
                     title += f" 💤 {mins}:{secs:02d}"
                 else:
-                    title += f" ⚡ {mins}:{secs:02d}"
+                    title += f" ⚡ {mins}:{secs:02d} remaining until idle"
 
             self.title = title
 
