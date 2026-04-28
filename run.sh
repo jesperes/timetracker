@@ -75,6 +75,11 @@ if [ "$DAEMON_MODE" = true ]; then
         <string>$VENV_PYTHON</string>
         <string>$TRACKER_SCRIPT</string>
     </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>
@@ -108,5 +113,5 @@ EOF
 else
     echo "▶️  Starting time tracker in foreground..."
     echo ""
-    "$VENV_PYTHON" "$TRACKER_SCRIPT"
+    PYTHONUNBUFFERED=1 "$VENV_PYTHON" "$TRACKER_SCRIPT"
 fi
