@@ -22,6 +22,9 @@ def get_idle_time_seconds():
     idle_seconds = CGEventSourceSecondsSinceLastEventType(
         kCGEventSourceStateHIDSystemState, 1
     )
+
+    print(f"Idle seconds: {idle_seconds}")
+
     return idle_seconds
 
 
