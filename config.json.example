@@ -1,0 +1,5 @@
+{
+  "idle_threshold_seconds": 120,
+  "idle_check_interval_seconds": 10,
+  "data_directory": "~/.worktime"
+}
