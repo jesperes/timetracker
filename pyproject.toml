@@ -12,6 +12,9 @@ dependencies = [
     "pyobjc",
 ]
 
+[project.optional-dependencies]
+dev = ["ruff", "mypy"]
+
 [project.scripts]
 timetracker = "timetracker.tracker:main"
 timetracker-daemon = "timetracker.menubar:main"
@@ -21,6 +24,9 @@ include = ["timetracker*"]
 
 [tool.mypy]
 ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]

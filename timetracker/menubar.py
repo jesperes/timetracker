@@ -49,11 +49,11 @@ def is_camera_active() -> bool:
 
     # Intel Mac fallback: VDCAssistant is only present when a camera session is open.
     try:
-        result = subprocess.run(
+        pgrep = subprocess.run(
             ["pgrep", "-x", "VDCAssistant"],
             capture_output=True, timeout=2,
         )
-        if result.returncode == 0:
+        if pgrep.returncode == 0:
             return True
     except Exception:
         pass
@@ -163,7 +163,7 @@ class TimeTrackerApp(rumps.App):
                 elif (idle_seconds <= self.idle_threshold or camera_on) and self.idle_auto_paused:
                     self.tracker.start()
                     self.idle_auto_paused = False
-                    print(f"Auto-resumed work session (user active after {int(idle_seconds)}s idle)")
+                    print(f"Auto-resumed work session (active after {int(idle_seconds)}s idle)")
 
             except Exception as e:
                 print(f"Error in idle monitor: {e}")

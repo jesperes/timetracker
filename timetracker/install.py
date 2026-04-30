@@ -62,7 +62,7 @@ def install() -> None:
     subprocess.run(["launchctl", "unload", str(PLIST_PATH)], capture_output=True)
     subprocess.run(["launchctl", "load", str(PLIST_PATH)], check=True)
 
-    print(f"Daemon installed and started.")
+    print("Daemon installed and started.")
     print(f"  Plist:  {PLIST_PATH}")
     print(f"  Binary: {daemon}")
     print(f"  Log:    {LOG_PATH}")
@@ -77,4 +77,4 @@ def uninstall() -> None:
     subprocess.run(["launchctl", "unload", str(PLIST_PATH)], capture_output=True)
     subprocess.run(["pkill", "-f", "timetracker-daemon"], capture_output=True)
     PLIST_PATH.unlink()
-    print(f"Daemon stopped and LaunchAgent removed.")
+    print("Daemon stopped and LaunchAgent removed.")
