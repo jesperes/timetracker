@@ -25,6 +25,9 @@ class TimeTracker:
     def start(self):
         """Record work session start time."""
         data = self._load_data()
+        if data["sessions"] and data["sessions"][-1]["end"] is None:
+            print("Session already active, not starting a new one")
+            return
         data["sessions"].append({
             "start": datetime.now().isoformat(),
             "end": None
