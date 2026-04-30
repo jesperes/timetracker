@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Menu bar time tracker for macOS."""
 
-import rumps
+import subprocess
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
-from watchdog.observers import Observer
+
+import rumps
 from watchdog.events import FileSystemEventHandler
-from time_tracker import TimeTracker
-from config import load_config
+from watchdog.observers import Observer
+
+from .config import load_config
+from .tracker import TimeTracker
 
 
 def get_idle_time_seconds():
@@ -18,14 +22,43 @@ def get_idle_time_seconds():
         kCGEventSourceStateHIDSystemState,
     )
 
-    # Get seconds since last keyboard/mouse event (idle time)
     idle_seconds = CGEventSourceSecondsSinceLastEventType(
         kCGEventSourceStateHIDSystemState, 1
     )
-
     print(f"Idle seconds: {idle_seconds}")
-
     return idle_seconds
+
+
+def is_camera_active() -> bool:
+    """Return True if the camera is currently in use (macOS)."""
+    # Apple Silicon: the ISP driver exposes FrontCameraActive / FrontCameraStreaming.
+    # Try this first; if the class exists we trust it exclusively (VDCAssistant runs
+    # persistently on Apple Silicon even with no active camera session).
+    try:
+        result = subprocess.run(
+            ["ioreg", "-r", "-c", "AppleH13CamIn"],
+            capture_output=True, text=True, timeout=3,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return (
+                '"FrontCameraActive" = Yes' in result.stdout
+                or '"FrontCameraStreaming" = Yes' in result.stdout
+            )
+    except Exception:
+        pass
+
+    # Intel Mac fallback: VDCAssistant is only present when a camera session is open.
+    try:
+        result = subprocess.run(
+            ["pgrep", "-x", "VDCAssistant"],
+            capture_output=True, timeout=2,
+        )
+        if result.returncode == 0:
+            return True
+    except Exception:
+        pass
+
+    return False
 
 
 class FileChangeHandler(FileSystemEventHandler):
@@ -36,7 +69,6 @@ class FileChangeHandler(FileSystemEventHandler):
         self.target_file = target_file
 
     def on_modified(self, event):
-        """Called when a file is modified."""
         if not event.is_directory and Path(event.src_path) == self.target_file:
             self.callback()
 
@@ -52,83 +84,83 @@ class TimeTrackerApp(rumps.App):
         self.tracker = TimeTracker()
         self.observer = None
         self.idle_monitor_thread = None
-        self.idle_auto_paused = False  # Track if we auto-paused due to idle
-        self.current_idle_seconds = 0  # Current idle time
+        self.idle_auto_paused = False
+        self.current_idle_seconds = 0
+        self._current_date = datetime.now().date()
 
-        # Menu items
         self.menu = [
             rumps.MenuItem("Start Work", callback=self.start_work),
             rumps.MenuItem("Stop Work", callback=self.stop_work),
-            None,  # separator
+            None,
             rumps.MenuItem("Reset Today", callback=self.reset_today),
         ]
 
-        # Start file monitoring and idle detection
         self.start_file_monitor()
         self.start_idle_monitor()
         self.update_timer_display()
 
     def start_work(self, sender):
-        """Start a work session."""
         self.tracker.start()
         self.is_running = True
         self.update_timer_display()
 
     def stop_work(self, sender):
-        """Stop the current work session."""
         self.tracker.stop()
         self.is_running = False
         self.idle_auto_paused = False
         self.update_timer_display()
 
     def reset_today(self, sender):
-        """Reset today's tracking."""
         response = rumps.alert(
             "Reset today's work time?",
             "This will delete all sessions for today.",
             ok="Reset",
             cancel="Cancel",
         )
-        if response == 0:  # OK button clicked
+        if response == 0:
             self.tracker.today_file.unlink(missing_ok=True)
             self.update_timer_display()
 
     def start_file_monitor(self):
-        """Start monitoring the tracking file for changes."""
         watch_dir = self.tracker.data_dir
         event_handler = FileChangeHandler(self.update_timer_display, self.tracker.today_file)
-
         self.observer = Observer()
         self.observer.schedule(event_handler, str(watch_dir), recursive=False)
         self.observer.start()
 
     def start_idle_monitor(self):
-        """Start monitoring for idle time."""
         self.idle_monitor_thread = threading.Thread(target=self._idle_monitor_loop, daemon=True)
         self.idle_monitor_thread.start()
 
     def _idle_monitor_loop(self):
-        """Check idle time periodically and auto-pause if needed."""
+        """Check idle time periodically and auto-pause/resume as needed."""
         while True:
             try:
+                # Midnight rollover: close any open session on the old day's file
+                today = datetime.now().date()
+                if today != self._current_date:
+                    print(f"Date rolled over from {self._current_date} to {today}")
+                    self.tracker.stop()
+                    self.idle_auto_paused = True
+                    self._current_date = today
+
                 idle_seconds = get_idle_time_seconds()
                 self.current_idle_seconds = idle_seconds
                 data = self.tracker._load_data()
 
-                # Check if there's an active session
                 has_active_session = any(s["end"] is None for s in data["sessions"])
 
-                # Update menu bar display with idle status
                 self.update_timer_display()
 
-                if idle_seconds > self.idle_threshold and has_active_session:
-                    # User is idle and session is active - auto pause
+                camera_on = is_camera_active()
+                print(f"Camera active: {camera_on}")
+
+                if idle_seconds > self.idle_threshold and not camera_on and has_active_session:
                     if not self.idle_auto_paused:
                         self.tracker.stop()
                         self.idle_auto_paused = True
                         print(f"Auto-paused work session (idle for {int(idle_seconds)}s)")
-                elif idle_seconds <= self.idle_threshold and self.idle_auto_paused:
-                    # User is active again - auto resume
+                elif (idle_seconds <= self.idle_threshold or camera_on) and self.idle_auto_paused:
                     self.tracker.start()
                     self.idle_auto_paused = False
                     print(f"Auto-resumed work session (user active after {int(idle_seconds)}s idle)")
@@ -148,7 +180,6 @@ class TimeTrackerApp(rumps.App):
             active_session = False
 
             for session in data["sessions"]:
-                from datetime import datetime
                 start = datetime.fromisoformat(session["start"])
                 if session["end"]:
                     end = datetime.fromisoformat(session["end"])
@@ -156,21 +187,14 @@ class TimeTrackerApp(rumps.App):
                 else:
                     duration = (datetime.now() - start).total_seconds()
                     active_session = True
-
                 total_seconds += duration
 
             hours = int(total_seconds // 3600)
             minutes = int((total_seconds % 3600) // 60)
 
-            # Create title with icon and time
-            if active_session:
-                icon = "▶️"  # Playing indicator
-            else:
-                icon = "⏸"  # Paused indicator
-
+            icon = "▶️" if active_session else "⏸"
             title = f"{icon} {hours}h {minutes}m"
 
-            # Add idle status if session is active
             if active_session:
                 remaining_seconds = max(0, self.idle_threshold - self.current_idle_seconds)
                 mins = int(remaining_seconds // 60)

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "timetracker"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "rumps>=0.4.0",
+    "watchdog>=3.0.0",
+    "pyobjc",
+]
+
+[project.scripts]
+timetracker = "timetracker.tracker:main"
+timetracker-daemon = "timetracker.menubar:main"
+
+[tool.setuptools.packages.find]
+include = ["timetracker*"]
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
