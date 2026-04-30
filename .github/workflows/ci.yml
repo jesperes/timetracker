@@ -16,10 +16,12 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: python -m pip install -e ".[dev]"
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -e ".[dev]"
 
       - name: ruff
-        run: python -m ruff check timetracker/
+        run: .venv/bin/ruff check timetracker/
 
       - name: mypy
-        run: python -m mypy timetracker/
+        run: .venv/bin/mypy timetracker/
