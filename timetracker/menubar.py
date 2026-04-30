@@ -84,7 +84,7 @@ class TimeTrackerApp(rumps.App):
         self.tracker = TimeTracker()
         self.observer = None
         self.idle_monitor_thread = None
-        self.idle_auto_paused = False
+        self.idle_auto_paused = True   # treat startup as coming out of a pause
         self.current_idle_seconds = 0
         self._current_date = datetime.now().date()
 

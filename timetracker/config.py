@@ -7,11 +7,10 @@ CONFIG_DIR = Path.home() / ".config" / "timetracker"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 DEFAULT_CONFIG: dict = {
-    "idle_threshold_seconds": 120,
-    "idle_check_interval_seconds": 10,
+    "idle_threshold_seconds": 300,
+    "idle_check_interval_seconds": 5,
     "data_directory": "~/.worktime",
 }
-
 
 def load_config() -> dict:
     """Load configuration, falling back to defaults for missing values."""
