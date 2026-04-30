@@ -106,14 +106,22 @@ class TimeTracker:
             label = f"  Work #{i + 1}:"
             end_str = "now" if is_active else fmt_time(session["end"])
             suffix = " (active)" if is_active else ""
-            print(f"{label:<12} {fmt_time(session['start'])} – {end_str}  ({fmt_duration(duration)}){suffix}")
+            print(
+                f"{label:<12} {fmt_time(session['start'])} – "
+                f"{end_str}  ({fmt_duration(duration)}){suffix}"
+            )
 
             if i + 1 < len(sessions):
                 next_start = datetime.fromisoformat(sessions[i + 1]["start"])
                 break_secs = (next_start - end).total_seconds()
                 total_break += break_secs
                 if break_secs >= 60:
-                    print(f"\033[2m  {'Break:':<10} {fmt_time(session['end'])} – {fmt_time(sessions[i + 1]['start'])}  ({fmt_duration(break_secs)})\033[0m")
+                    print(
+                        f"\033[2m  {'Break:':<10} "
+                        f"{fmt_time(session['end'])} – "
+                        f"{fmt_time(sessions[i + 1]['start'])}"
+                        f"  ({fmt_duration(break_secs)})\033[0m"
+                    )
 
         print()
         active_note = " (session in progress)" if sessions[-1]["end"] is None else ""
